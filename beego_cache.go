@@ -88,7 +88,19 @@ func (this *Cache) CacheFile(path string, stat os.FileInfo, new_file_path string
 
 func (this *Cache) CacheInit() error {
 	if this.cache == nil {
-		bm, err := cache.NewCache("redis", `{"conn":":6379"}`)  
+    cache_engine := beego.AppConfig.DefaultString("cache_engine", "file")
+    cache_config := beego.AppConfig.DefaultString("cache_config", "")
+    if (cache_engine == "file" && cache_config == "") {
+      cache_config = `{"CachePath":"./tmp/cache","FileSuffix":".cache","DirectoryLevel":2,"EmbedExpiry":86400}`
+    }
+    if (cache_engine == "redis" && cache_config == "") {
+      cache_config = `{"conn":":6379"}`
+    }
+    if (cache_config == "memcache" && cache_config == "") {
+      cache_config = `{"conn":"127.0.0.1:11211"}`
+    }
+    beego.Debug("cache", cache_engine, cache_config)
+		bm, err := cache.NewCache(cache_engine, cache_config)  
 		this.cache = bm
 		if err != nil{
 			beego.Error("cache init error: ", err.Error())
