@@ -82,7 +82,7 @@ func (this *Cache) CacheFile(path string, stat os.FileInfo, new_file_path string
 	name := fmt.Sprintf("file_%s", path)
 	err := this.CacheSetMax(name, fmt.Sprintf("%d|%s|%s", stat.Size(), stat.ModTime().Format(time.RFC3339), new_file_path))
 	if err != nil {
-		beego.Debug("error set cacheFile", err.Error())
+		beego.Debug("CacheFile error", err.Error())
 	}
 }
 
@@ -99,7 +99,7 @@ func (this *Cache) CacheInit() error {
     if (cache_config == "memcache" && cache_config == "") {
       cache_config = `{"conn":"127.0.0.1:11211"}`
     }
-    beego.Debug("cache", cache_engine, cache_config)
+    // beego.Debug("cache", cache_engine, cache_config)
 		bm, err := cache.NewCache(cache_engine, cache_config)  
 		this.cache = bm
 		if err != nil{
