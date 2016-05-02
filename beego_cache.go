@@ -4,7 +4,7 @@ import (
   "github.com/astaxie/beego/cache"
 	_ "github.com/astaxie/beego/cache/redis"
   "github.com/astaxie/beego"
-  "github.com/astaxie/beego/logs"
+  // "github.com/astaxie/beego/logs"
   "os"
   "time"
   "fmt"
@@ -17,7 +17,6 @@ type Cache struct {
 }
 
 var instantiated *Cache = nil
-var Logger = logs.NewLogger(10000)
 const PREFIX = "[ CACHE ] "
 
 func GetCache() *Cache {
@@ -30,8 +29,9 @@ func GetCache() *Cache {
 
 func (this *Cache) FileChanged(path string) bool {
 	cache_size, cache_time, cache_new_file, err := this.FileCacheStat(path)
+  // Debug("cache %d, %s", cache_size, cache_time)
 	if err != nil {
-		beego.Debug("Filecachestat error:", err.Error())
+		Error("Filecachestat error:", err.Error())
 		return true
 	}
 	
@@ -40,15 +40,18 @@ func (this *Cache) FileChanged(path string) bool {
     Warning("Unable to stat asset %s", path)// Could not obtain stat, handle error
 		return true
 	}
+  
 	if fi.Size() != cache_size || fi.ModTime() != cache_time  {
 		return true
 	}
 	
 	//ensure file exists
-	if _, err := os.Stat(cache_new_file); os.IsNotExist(err) {
-		Warning("Cache file missing", cache_new_file)
-		return true
-	}
+  if (cache_new_file != "") {
+    if _, err := os.Stat(cache_new_file); os.IsNotExist(err) {
+  		Warning("Cache file missing", cache_new_file)
+  		return true
+  	}
+  }
 	
 	return false
 }
@@ -56,15 +59,12 @@ func (this *Cache) FileChanged(path string) bool {
 func (this *Cache) FileCacheStat(path string) (file_size int64, file_modtime time.Time, file_dest string, err error) {
 	name := fmt.Sprintf("file_%s", path)
 	if this.CacheExists(name) {
-		// beego.Debug("Cache exists", name)
 		cache := this.CacheGet(name)
 		res   := strings.Split(cache, "|")
-		// beego.Debug(fmt.Sprintf("result: %q", res))
 		file_size, err := strconv.ParseInt(res[0], 10, 64)
 		if (err != nil) {
 			Warning("FileCacheStat: can't get size from cache for %s", path)
 		}
-		// beego.Debug("cache:", cache)
 		// https://gobyexample.com/time-formatting-parsing
 		file_modtime, err := time.Parse(time.RFC3339, res[1]) //TODO
 		if (err != nil) {
@@ -73,17 +73,28 @@ func (this *Cache) FileCacheStat(path string) (file_size int64, file_modtime tim
 		file_dest  := res[2]
 		return file_size, file_modtime, file_dest, nil
 	} else {
-		beego.Debug("Cache missing", name)
+		Debug("Cache missing %s", name)
 		return 0, time.Time{}, "", fmt.Errorf("File missing: %f", path)
 	}
 }
 
-func (this *Cache) CacheFile(path string, stat os.FileInfo, new_file_path string) {
+func (this *Cache) CacheFile(path string, stat os.FileInfo, new_file_path string) error {
 	name := fmt.Sprintf("file_%s", path)
-	err := this.CacheSetMax(name, fmt.Sprintf("%d|%s|%s", stat.Size(), stat.ModTime().Format(time.RFC3339), new_file_path))
+  var size int64 = 0
+  if (stat == nil) {
+    stat2, err := os.Stat(path)
+    if (err != nil) {
+      beego.Warning("Unable to stat file", path, err.Error())
+      return err
+    }
+    stat = stat2
+  }
+  size = stat.Size()
+	err := this.CacheSetMax(name, fmt.Sprintf("%d|%s|%s", size, stat.ModTime().Format(time.RFC3339), new_file_path))
 	if err != nil {
-		beego.Debug("CacheFile error", err.Error())
+	Debug("CacheFile error %s", err.Error())
 	}
+  return err
 }
 
 func (this *Cache) CacheInit() error {
@@ -99,7 +110,7 @@ func (this *Cache) CacheInit() error {
     if (cache_config == "memcache" && cache_config == "") {
       cache_config = `{"conn":"127.0.0.1:11211"}`
     }
-    // beego.Debug("cache", cache_engine, cache_config)
+    // Debug("cache: %s %s", cache_engine, cache_config)
 		bm, err := cache.NewCache(cache_engine, cache_config)  
 		this.cache = bm
 		if err != nil{
@@ -117,7 +128,7 @@ func (this *Cache) CacheName(name string) string {
 
 func (this *Cache) CacheGet(name string) string {
 	result := fmt.Sprintf("%s", this.cache.Get(this.CacheName(name)))
-	// beego.Debug("cache_get", name, fmt.Sprintf("%q", result))
+	//Debug("cache_get %s %q", name, result)
 	return result
 }
 
@@ -133,10 +144,12 @@ func (this *Cache) CacheSetMax(name string, value string) error {
 func (this *Cache) CacheExists(name string) bool {
 	return this.cache.IsExist(this.CacheName(name))
 }
-
+func Debug(format string, v... interface{}) {
+	beego.Debug(fmt.Sprintf(PREFIX + format, v...))
+}
 func Warning(format string, v... interface{}) {
-	Logger.Warning(PREFIX + format, v...)
+  beego.Warning(fmt.Sprintf(PREFIX + format, v...))
 }
 func Error(format string, v... interface{}) {
-	Logger.Error(PREFIX + format, v...)
+  beego.Error(fmt.Sprintf(PREFIX + format, v...))
 }
