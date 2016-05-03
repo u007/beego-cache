@@ -31,7 +31,7 @@ func (this *Cache) FileChanged(path string) bool {
   cache_size, cache_time, cache_new_file, err := this.FileCacheStat(path)
   // Debug("cache %d, %s", cache_size, cache_time)
   if err != nil {
-    Error("Filecachestat error: %s", err.Error())
+    Warning("Filecachestat error: %s", err.Error())
     return true
   }
   
